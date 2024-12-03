@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase-IoT-Dashboard</title>
+    <link rel="icon" href="https://github.githubassets.com/favicons/favicon-dark.png">
+
+    <!-- update the version number as needed -->
+    <script defer src="/__/firebase/8.4.2/firebase-app.js"></script>
+    <!-- include only the Firebase features as you need -->
+    <script defer src="/__/firebase/8.4.2/firebase-database.js"></script>
+    <!-- initialize the SDK after all desired features are loaded -->
+    <script defer src="/__/firebase/init.js"></script>
+    <!-- firebase.database().ref('/path/to/ref').on('value', snapshot => { }); -->
+    
+    <!------------------------Styling------------------------->
+    <style>
+        body{
+            height: 100vh;
+            font-family: sans-serif;
+            font-size: 100%;
+            text-align: center;
+            background-color: #d8d8d8;
+            box-sizing: border-box;
+            margin: 0;
+            display:grid;
+        }
+        header, footer{
+            /*width: 100vw;*/       
+            background: #5cc0fa;
+            color: #fff;
+
+        }
+        header {
+            grid-row-start: 1;
+            grid-row-end: 2;
+        }
+        footer {
+            grid-row-start: 8;
+            grid-row-end: 9;
+        }
+        .panel{
+            color: #474747;
+            width: 70vw;
+            border: 1px solid #000;
+            border-radius: 30px;
+            background-color: #ffffff;
+            margin: auto;
+            display: grid;
+            grid-auto-flow: column;
+            grid-gap: 20px;
+            padding: 2vh 1.2vw;
+            grid-row-start: 4;
+            grid-row-end: 6;
+        }
+        .texts {
+            grid-column: 2 / span 3;
+        }
+        .panel .userPanel, .panel .mcuPanel {
+            border: 1px solid #000;
+            border-radius: 20px;
+            padding: 2%;
+        }
+        .panel .userPanel {
+            grid-row-start : 1;
+            grid-row-end : 3;
+            display: grid;
+            
+        }
+        .panel .mcuPanel {
+            grid-row-start : 3;
+            grid-row-end : 5;
+            display: grid;
+        }
+        .toggle {
+            grid-column-start: 1;
+            grid-column-end: 3;
+        }
+        .slider {
+            grid-column-start: 3;
+            grid-column-end: 6;
+        }
+        .gauge {
+            grid-column-start: 1;
+            grid-column-end: 3;
+        }
+        .state {
+            grid-column-start: 3;
+            grid-column-end: 6;
+        }
+        .state #statebox {
+            width: 100px;
+            border: 1px solid #a5a5a5;
+            border-radius: 10px;
+            margin: 0 auto;
+        }
+        #statebox {
+            padding: 10px;
+            color: #fff;
+            background-color: #67bd5f;
+        }
+        #gaugeReading {
+            font-size: 75%;
+            text-align: center;
+        }
+        /*======Styling required for toggle switch======*/
+        /* The switch - the box around the slider */
+        .toggle .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        /* Hide default HTML checkbox */
+        .toggle .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        /* The key */
+        .toggle .key {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            -webkit-transition: .4s;
+            transition: .4s;
+        }
+
+        .toggle .key:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            -webkit-transition: .4s;
+            transition: .4s;
+        }
+
+        .toggle input:checked + .key {
+            background-color: #2196F3;
+        }
+
+        .toggle input:focus + .key {
+            box-shadow: 0 0 1px #2196F3;
+        }
+
+        .toggle input:checked + .key:before {
+            -webkit-transform: translateX(26px);
+            -ms-transform: translateX(26px);
+            transform: translateX(26px);
+        }
+
+        /* Rounded sliders */
+        .toggle .key.round {
+            border-radius: 34px;
+        }
+
+        .toggle .key.round:before {
+            border-radius: 50%;
+        }
+        /*======Styling required for toggle switch======*/
+        .gauge #gaugeMinVal, #gaugeMaxVal {
+            font-size: 75%;
+            display: inline;
+        }
+
+        #connectionState {
+            color: #474747;
+            z-index: 100;
+        }
+        /*========Just for responsiveness========*/
+        @media only screen and (max-width: 845px) {
+            h1 {
+                margin : 0.2em;
+                font-size: 180%;
+            }
+            p {
+                margin: 0.5em;
+                font-size: 75%;
+            }
+            .panel {
+                display: block;
+                padding: 10px;
+                width: 80vw;
+            }
+            .panel .userPanel, .panel .mcuPanel {
+                display: block;
+            }
+            .panel .userPanel {
+                margin-bottom: 10px;
+            }
+        }
+        /*========Just for responsiveness========*/
+    </style>
+    <!------------------------Styling------------------------->
+</head>
+
+
+<body>
+    <!------------------------Page Layout Content------------------------->
+    <header>
+        <h1>IoT Firebase dashboard</h1>
+    </header>
+
+    <p id="connectionState">Connecting to server....!</p>
+
+    <!--First panel-->
+    <div class="panel 1">
+        <div class="userPanel">
+        <h3 class="texts">Control GPIOs</h3>
+            <!--button to toggle-->
+            <div class="toggle">
+                <h4>Toggle</h4>
+                <label class="switch">
+                    <input type="checkbox" id="button">
+                    <span class="key round"></span>
+                </label>
+                <div id='buttonval'></div>
+            </div>
+            <!--slider to adjust-->
+            <div class="slider">
+                <h4>Adjust</h4>
+                <input type="range" id="slidervalue" name="slidervalue" min="0" max="1023">
+                <div id='sliderval'></div>
+            </div>
+        </div>
+        <div class="mcuPanel">
+            <h3 class="texts">Display Data</h3>
+            <!--Gauge to show readings-->
+            <div class="gauge">
+                <h4>Reading</h4>
+                <div id="gaugeMinVal"></div>
+                <meter id="rangeval" value="512" min="0" max="1023"></meter>
+                <div id="gaugeMaxVal"></div>
+                <br>
+                <div id="gaugeReading"></div>
+            </div>
+            <div class="state">
+                <h4>State</h4>
+                <div id="statebox">True</div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>A contribution to the Robotics Society - KGEC</p>
+    </footer>
+    <!------------------------Page Layout Content------------------------->
+
+
+
+    <!------------------------Scripting------------------------->
+    <script>
+        // The output objects
+        const button = document.getElementById("button");
+        const slider = document.getElementById("slidervalue");
+
+        //  Objects to display the value
+        const outputSlider = document.getElementById("sliderval");
+        const outputSwitch = document.getElementById("buttonval");
+
+        const outputGauge = document.getElementById("rangeval");
+        const gaugeMinVal = document.getElementById("gaugeMinVal");
+        const gaugeMaxVal = document.getElementById("gaugeMaxVal");
+        const gaugeReading = document.getElementById("gaugeReading");
+
+        const outputState = document.getElementById("statebox");
+        const connectionState = document.getElementById("connectionState");
+
+        /*==================Functions===================*/
+        function setOutputState(state_value){
+            outputState.innerHTML = state_value;
+            if (state_value)
+                outputState.style.backgroundColor = "#67bd5f";
+            else
+                outputState.style.backgroundColor = "#606164";
+        }
+
+        /*===== Firebase Methods =====*/
+        document.addEventListener("DOMContentLoaded", () => {
+            console.log(firebase);
+            const database = firebase.database();
+
+            //  When the HTML body loads for the first time
+            document.body.onload = () => {
+                outputSlider.innerHTML = slider.value; // Display the default slider value
+                outputSwitch.innerHTML = button.checked ? "on" : "off"; // Display the default button value
+                gaugeMinVal.innerHTML = outputGauge.min;
+                gaugeMaxVal.innerHTML = outputGauge.max;
+                gaugeReading.innerHTML = outputGauge.value;
+                document.getElementsByClassName("panel").hidden = true;
+            }
+
+            //   flag
+            var firstLoad = true;
+
+            updateView = (data) => {
+                // The State box
+                setOutputState(data.Inputs.D0);
+                // The Reading Gauge
+                outputGauge.value = data.Inputs.A0;
+                gaugeReading.innerHTML = outputGauge.value;
+                // The Toggle Switch
+                button.checked = data.Keys.state;
+                outputSwitch.innerHTML = button.checked ? "on" : "off";
+                // The Adjust Slider
+                slider.value = data.Keys.level;
+                outputSlider.innerHTML = slider.value;
+            };
+
+            updateDatabase = () => {
+                var data = {
+                    level: Number(slider.value),
+                    state: button.checked,
+                };
+                //  Show the state on the page
+                outputSwitch.innerHTML = button.checked ? "on" : "off";
+                //  Show the level on the page
+                outputSlider.innerHTML = slider.value;
+                console.log(data);
+                console.log(database.ref("/devices/Keys").update(data));
+            };
+
+            removeConnectingMsg = () => {
+                connectionState.hidden = true;
+                document.getElementsByClassName("panel").hidden = false;
+            };
+
+            // event listeners
+            button.addEventListener("change", (event) => updateDatabase());
+            slider.addEventListener("change", (event) => updateDatabase());
+            slider.oninput = () => {
+                outputSlider.innerHTML = slider.value;
+            }
+
+            // database event listeners
+            const keysRef = database.ref("/devices");
+                keysRef.on("value", (snap) => {
+                    const data = snap.val();
+                    console.log(data);
+                    if (firstLoad) {
+                        removeConnectingMsg();
+                        firstLoad = false;
+                    }
+                    updateView(data);
+                });
+            });
+        /*====================*/
+    </script>
+    <!------------------------Scripting------------------------->
+</body>
+</html>

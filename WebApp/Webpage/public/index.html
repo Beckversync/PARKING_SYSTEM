@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HCMUT-SMART PARKING</title>
+    <link rel="icon" href="https://upload.wikimedia.org/wikipedia/commons/f/f0/HCMCUT.svg">
+    
+    <!-- Firebase -->
+    <script defer src="/__/firebase/8.4.2/firebase-app.js"></script>
+    <script defer src="/__/firebase/8.4.2/firebase-database.js"></script>
+    <script defer src="/__/firebase/init.js"></script>
+
+
+        <!-- Leaflet CSS -->
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+
+:root {
+            --primary-color: #2196f3;
+            --secondary-color: #f4f7fa;
+            --text-color: #333;
+            --panel-bg: #ffffff;
+            --border-radius: 10px;
+            --box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+        }
+
+        header, footer {
+            background: var(--primary-color);
+            color: white;
+            text-align: center;
+            padding: 1rem;
+            font-size: 1.3rem;
+            box-shadow: var(--box-shadow);
+        }
+
+        main {
+            flex-grow: 1;
+            display: grid;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--box-shadow);
+    text-align: center;
+    transition: transform 0.2s ease-in-out;
+    display: flex; /* Sử dụng flexbox */
+    flex-direction: column; /* Đảm bảo các phần tử con được căn chỉnh dọc */
+        }
+
+        .toggle {
+    margin: 1rem 0; /* Khoảng cách giữa các toggle */
+    display: flex;
+    align-items: center;
+    justify-content: flex-start; /* Căn trái để các phần tử không bị lệch */
+    gap: 10px; /* Thêm khoảng cách giữa label và switch */
+}
+.panel:hover {
+            transform: translateY(-5px);
+        }
+
+
+        .panel h3 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+
+        .panel > #map {
+    flex-grow: 1; /* Đảm bảo bản đồ chiếm toàn bộ không gian còn lại */
+}
+
+.weather-display {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .weather-icon img {
+            width: 60px;
+            height: 60px;
+        }
+
+
+        .toggle .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+        .toggle .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle .key {
+            position: absolute;
+            background-color: #ccc;
+            border-radius: 28px;
+            transition: 0.3s;
+            width: 100%;
+            height: 100%;
+        }
+
+
+        .toggle .key:before {
+            content: "";
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background-color: white;
+            border-radius: 50%;
+            bottom: 3px;
+            left: 3px;
+            transition: 0.3s;
+        }
+
+        .toggle input:checked + .key {
+            background-color: #4caf50;
+        }
+
+        .toggle input:checked + .key:before {
+            transform: translateX(22px);
+        }
+
+        .gauge meter {
+            width: 100%;
+            height: 20px;
+            border-radius: 5px;
+        }
+
+        .slider input[type="range"] {
+            width: 100%;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%; /* Đảm bảo bản đồ chiếm toàn bộ chiều rộng */
+            border-radius: var(--border-radius); /* Thêm bo góc cho đẹp */
+            overflow: hidden; /* Đảm bảo không có phần dư thừa */
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>SMART PARKING SYSTEM</h1>
+    </header>
+
+    <main>
+        <p id="connectionState">Connecting to server...</p>
+        <div class="panel">
+            <h3>HỆ THỐNG BARRIER</h3>
+            <div class="toggle">
+                <label>BARRIER LEFT</label>
+                <label class="switch">
+                    <input type="checkbox" id="barrierLeft">
+                    <span class="key"></span>
+                </label>
+            </div>
+            <div class="toggle">
+                <label>BARRIER RIGHT</label>
+                <label class="switch">
+                    <input type="checkbox" id="barrierRight">
+                    <span class="key"></span>
+                </label>
+            </div>
+            <div class="slider">
+                <label>ĐỘ SÁNG</label>
+                <input type="range" id="sliderLevel" min="0" max="100">
+                <p id="sliderValue">0</p>
+            </div>
+        </div>
+
+        <div class="panel" hidden>
+            <h3>SỐ LƯỢNG XE TRONG BÃI</h3>
+            <div class="gauge">
+                <meter id="carCount" value="0" min="0" max="10"></meter>
+                <p id="carCountValue">0</p>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>THỜI TIẾT HIỆN TẠI</h3>
+            <div class="weather-display">
+                <div class="weather-icon">
+                    <img id="weatherIcon" src="" alt="Weather Icon" style="width: 70px; height: 70px;">
+                </div>
+                <div class="weather-info">
+                    <p id="currentTime">Giờ hiện tại: Đang tải...</p>
+                    <p id="currentWeather">Đang tải thông tin thời tiết...</p>
+                    <p>Cảm giác như: <span id="feelsLike">...</span>°C</p>
+                    <p>Độ ẩm: <span id="humidity">...</span>%</p>
+                    <p>Không khí: <span id="airQuality" style="color: orange;"> Tốt</span></p>
+                </div>
+            </div>
+        </div>
+
+                <!-- Panel Bản đồ -->
+                <div class="panel" style="height: 400px;">
+                    <h3>BẢN ĐỒ</h3>
+                    <div id="map"></div>
+                </div>
+
+    </main>
+
+    <footer>
+        <p>Nhóm 9 - ĐỒ ÁN THIẾT KẾ LUẬN LÝ</p>
+    </footer>
+
+    <script>
+      const connectionState = document.getElementById('connectionState');
+      const barrierLeft = document.getElementById('barrierLeft');
+      const barrierRight = document.getElementById('barrierRight');
+      const sliderLevel = document.getElementById('sliderLevel');
+      const sliderValue = document.getElementById('sliderValue');
+      const carCount = document.getElementById('carCount');
+      const carCountValue = document.getElementById('carCountValue');
+      const panels = document.querySelectorAll('.panel');
+      const currentTime = document.getElementById('currentTime');
+      const currentWeather = document.getElementById('currentWeather');
+
+
+      const fetchWeather = async () => {
+    const apiKey = 'bd5e378503939ddaee76f12ad7a97608';
+    const apiUrl = `https://api.openweathermap.org/data/2.5/weather?q=Ho Chi Minh&units=metric&appid=${apiKey}`;
+    
+    try {
+        // Gọi API OpenWeatherMap
+        const response = await fetch(apiUrl);
+
+        // Kiểm tra nếu phản hồi không thành công
+        if (!response.ok) {
+            throw new Error(`HTTP Error: ${response.status}`);
+        }
+
+        // Chuyển đổi dữ liệu thành JSON
+        const data = await response.json();
+
+        // Lấy dữ liệu từ API
+        const temperature = Math.round(data.main.temp);
+        const feelsLike = Math.round(data.main.feels_like);
+        const humidity = data.main.humidity;
+        const description = data.weather[0].description;
+        const weatherIcon = `https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png`;
+
+        // Lấy thời gian hiện tại
+        const now = new Date();
+        const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        // Cập nhật giao diện người dùng
+        document.getElementById('currentTime').textContent = `Giờ hiện tại: ${timeString}`;
+        document.getElementById('currentWeather').textContent = `Nhiệt độ: ${temperature}°C, Trạng thái: ${description}`;
+        document.getElementById('feelsLike').textContent = feelsLike;
+        document.getElementById('humidity').textContent = humidity;
+        document.getElementById('weatherIcon').src = weatherIcon;
+    } catch (error) {
+        // Xử lý lỗi và thông báo cho người dùng
+        console.error('Lỗi khi tải thông tin thời tiết:', error);
+        document.getElementById('currentWeather').textContent = 'Không thể tải thông tin thời tiết.';
+    }
+};
+
+
+let map;
+
+function initMap() {
+    map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: 10.8231, lng: 106.6297 }, // Vị trí mặc định là TP Hồ Chí Minh
+        zoom: 12
+    });
+}
+
+// Tải Google Maps API
+const script = document.createElement('script');
+<!-- Thêm Google Maps API với API key thực tế -->
+script.src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCjtJBKZBAwmCEd6kOnsTvvRsm5XMuVOTE";
+
+
+script.async = true;
+document.head.appendChild(script);
+
+
+
+      document.addEventListener('DOMContentLoaded', () => {
+          const database = firebase.database();
+          fetchWeather();
+          setInterval(fetchWeather, 600000); // 10 phút
+        
+          const map = L.map('map').setView([10.8231, 106.6297], 12); // Vị trí TP.HCM
+
+// Thêm lớp gạch OpenStreetMap
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);
+
+
+          
+          const updateUI = (data) => {
+              barrierLeft.checked = data.barrierLeft;
+              barrierRight.checked = data.barrierRight;
+              sliderLevel.value = data.level;
+              sliderValue.textContent = data.level;
+              carCount.value = data.carCount;
+              carCountValue.textContent = data.carCount;
+          };
+  
+           updateDatabase = () => {
+              const data = {
+                  barrierLeft: barrierLeft.checked,
+                  barrierRight: barrierRight.checked,
+                  level: sliderLevel.value,
+                  carCount: carCount.value // Đồng bộ carCount lên Firebase
+              };
+              database.ref('/ParkingData/Status').update(data);
+          };
+  
+          // Lắng nghe dữ liệu từ Firebase và cập nhật giao diện
+          database.ref('/ParkingData/Status').on('value', (snapshot) => {
+              const data = snapshot.val();
+              connectionState.hidden = true;
+              panels.forEach(panel => panel.hidden = false);
+              updateUI(data);
+          });
+  
+    
+
+  
+          // Các sự kiện khác
+          barrierLeft.addEventListener('change', updateDatabase);
+          barrierRight.addEventListener('change', updateDatabase);
+          sliderLevel.addEventListener('input', () => {
+              sliderValue.textContent = sliderLevel.value;
+          });
+          sliderLevel.addEventListener('change', updateDatabase);
+      });
+  </script>
+</body>
+
+</html>
